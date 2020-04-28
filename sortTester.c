@@ -6,6 +6,8 @@
 #define TAG 0
 #define MIN_TO_MAX 0
 
+// Hamami aya po
+
 void oddEvenSort(float *myValue, int n, int pLeft, int pRight, int location, int direction, int my_rank);
 void compare(float *myValue, float *otherValue, int direction);
 
