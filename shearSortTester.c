@@ -18,6 +18,8 @@ void compare(float *myValue, float *otherValue, int direction);
 void sanityCheck(int numOfProcesses, int n);
 MPI_Comm getNewCommunicator(int n);
 void getCoordinatesFromGivenRank(MPI_Comm newCommunicator, int rank, int *rowIndex, int *colIndex);
+int getRankFromGivenCoordinates(MPI_Comm newCommunicator, int *rowIndex, int *colIndex);
+void getNeighborsRanksFromGivenRank(MPI_Comm newCommunicator, int rank, int *pRightRank, int *pLeftRank);
 
 int main(int argc, char *argv[])
 {
@@ -45,30 +47,30 @@ int main(int argc, char *argv[])
     getCoordinatesFromGivenRank(newCommunicator, rank, &rowIndex, &colIndex);
     printf("The coordinates are: %d %d\n", rowIndex, colIndex);
 
-    // Assigning each process it's new index in the imaginary matrix
-    if (rank == 0)
-    {
-        coordinatesArray[0] = n - 1;
-        coordinatesArray[1] = n - 1;
-        //	getting the rank from coordinates.
-        MPI_Cart_rank(newCommunicator, coordinatesArray, &newId);
-        printf("The processor at position (%d, %d) has rank %d\n", coordinatesArray[0], coordinatesArray[1], newId);
-        fflush(stdout);
-    }
+    rank = getRankFromGivenCoordinates(newCommunicator, &rowIndex, &colIndex);
 
-    // getNeighbors
-    if (rank == 5)
-    {
-        // getting the neighbors (pLeftRank & pRightRank) – (group, dimension – on this
-        //one - horizontal, num-of-hops – on this one – direct neighbors,
-        // &pLeftRank, &pRightRank)
-        MPI_Cart_shift(newCommunicator, HORIZONTAL_DIRECTION, DIRECT_NEIGHBORS, &pLeftRank, &pRightRank);
-        printf("Rank = %d pLeftRank = %d  pRightRank %d\n", rank, pLeftRank, pRightRank);
-        fflush(stdout);
-    }
+    getNeighborsRanksFromGivenRank(newCommunicator, rank, &pRightRank, &pLeftRank);
 
     MPI_Finalize();
     return 0;
+}
+
+void getNeighborsRanksFromGivenRank(MPI_Comm newCommunicator, int rank, int *pRightRank, int *pLeftRank)
+{
+    MPI_Cart_shift(newCommunicator, HORIZONTAL_DIRECTION, DIRECT_NEIGHBORS, pLeftRank, pRightRank);
+    // printf("Rank = %d pLeftRank = %d  pRightRank %d\n", rank, *pLeftRank, *pRightRank);
+    fflush(stdout);
+}
+
+int getRankFromGivenCoordinates(MPI_Comm newCommunicator, int *rowIndex, int *colIndex)
+{
+    int newRank, coordinatesArray[2];
+    coordinatesArray[0] = *rowIndex;
+    coordinatesArray[1] = *colIndex;
+    MPI_Cart_rank(newCommunicator, coordinatesArray, &newRank);
+    // printf("The processor at position (%d, %d) has rank %d\n", coordinatesArray[0], coordinatesArray[1], newId);
+    fflush(stdout);
+    return newRank;
 }
 
 void getCoordinatesFromGivenRank(MPI_Comm newCommunicator, int rank, int *rowIndex, int *colIndex)
