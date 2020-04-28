@@ -91,7 +91,7 @@ MPI_Comm getNewCommunicator(int n)
     numOfDimensionsArray[1] = n;
     isPeriodicArray[0] = 0;
     isPeriodicArray[1] = 0;
-    reorder = 1; // probably lets it to reorder
+    reorder = 0;
     MPI_Cart_create(MPI_COMM_WORLD, NUM_OF_DIMENSIONS, numOfDimensionsArray, isPeriodicArray, reorder, &newCommunicator);
     return newCommunicator;
 }
@@ -112,7 +112,7 @@ void sanityCheck(int numOfProcesses, int n)
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
-void oddEvenSort(float *myValue, int n, int pLeft, int pRight, int location, int direction)
+void oddEvenSort(float *myValue, int n, int pLeftRank, int pRightRank, int location, int direction)
 {
     MPI_Status status;
     float *otherValue = (float *)malloc(sizeof(float));
@@ -124,14 +124,14 @@ void oddEvenSort(float *myValue, int n, int pLeft, int pRight, int location, int
             if (location % 2 == 0) // If the location is even
             {
                 // As for right now - the even location on the even iteration sorts and sends back.
-                MPI_Recv(otherValue, 1, MPI_FLOAT, pRight, TAG, MPI_COMM_WORLD, &status);
+                MPI_Recv(otherValue, 1, MPI_FLOAT, pRightRank, TAG, MPI_COMM_WORLD, &status);
                 compare(myValue, otherValue, direction);
-                MPI_Send(otherValue, 1, MPI_FLOAT, pRight, TAG, MPI_COMM_WORLD);
+                MPI_Send(otherValue, 1, MPI_FLOAT, pRightRank, TAG, MPI_COMM_WORLD);
             }
             else // if the location is odd
             {
-                MPI_Send(myValue, 1, MPI_FLOAT, pLeft, TAG, MPI_COMM_WORLD);
-                MPI_Recv(myValue, 1, MPI_FLOAT, pLeft, TAG, MPI_COMM_WORLD, &status);
+                MPI_Send(myValue, 1, MPI_FLOAT, pLeftRank, TAG, MPI_COMM_WORLD);
+                MPI_Recv(myValue, 1, MPI_FLOAT, pLeftRank, TAG, MPI_COMM_WORLD, &status);
             }
         }
         else // if odd iteration
@@ -140,15 +140,15 @@ void oddEvenSort(float *myValue, int n, int pLeft, int pRight, int location, int
             {
                 if (location % 2 == 0) // if location is even
                 {
-                    MPI_Send(myValue, 1, MPI_FLOAT, pLeft, TAG, MPI_COMM_WORLD);
-                    MPI_Recv(myValue, 1, MPI_FLOAT, pLeft, TAG, MPI_COMM_WORLD, &status);
+                    MPI_Send(myValue, 1, MPI_FLOAT, pLeftRank, TAG, MPI_COMM_WORLD);
+                    MPI_Recv(myValue, 1, MPI_FLOAT, pLeftRank, TAG, MPI_COMM_WORLD, &status);
                 }
                 else // if location is odd
                 {
                     // As for right now - the odd location on the odd iteration sorts and sends.
-                    MPI_Recv(otherValue, 1, MPI_FLOAT, pRight, TAG, MPI_COMM_WORLD, &status);
+                    MPI_Recv(otherValue, 1, MPI_FLOAT, pRightRank, TAG, MPI_COMM_WORLD, &status);
                     compare(myValue, otherValue, direction);
-                    MPI_Send(otherValue, 1, MPI_FLOAT, pRight, TAG, MPI_COMM_WORLD);
+                    MPI_Send(otherValue, 1, MPI_FLOAT, pRightRank, TAG, MPI_COMM_WORLD);
                 }
             }
         }
