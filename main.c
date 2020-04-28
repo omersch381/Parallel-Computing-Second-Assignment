@@ -11,7 +11,7 @@
 #define MIN_TO_MAX 0
 #define BUFFER_SIZE 100
 
-typedef struct box
+struct Box
 {
     int id;
     int length;
@@ -21,13 +21,27 @@ typedef struct box
 
 int floorSqrt(int x);
 void initFloatsRead(int n, int my_rank /*, TODO*/);
-void scatterValuesToOtherProcesses(struct box boxesArray[], int my_rank);
-void printBox(struct box givenBox);
-struct box handleFileRead(int n, int my_rank /*TODO*/);
+void scatterValuesToOtherProcesses(struct Box BoxesArray[], int my_rank);
+void printBox(struct Box givenBox);
+// struct Box *handleFileRead(int n, int my_rank /*TODO*/);
 void oddEvenSort(float *myValue, int n, int pLeft, int pRight, int location, int direction);
 void compare(float *myValue, float *otherValue, int direction);
 // int pack(char *buffer, int *id, int *length, int *width, int *height);
 // void unpack(char *buffer, int *id, int *length, int *width, int *height);
+
+// /* create a type for struct Box */
+// const int nitems = 4;
+// struct Box box;
+// int blocklengths[4] = {1, 1, 1, 1};
+// MPI_Datatype types[4] = {MPI_INT, MPI_FLOAT, MPI_FLOAT, MPI_FLOAT};
+// MPI_Datatype mpi_box_type;
+// MPI_Aint offsets[4];
+// offsets[0] = (char *)&box.id - (char *)&box;
+// offsets[1] = (char *)&box.length - (char *)&box;
+// offsets[2] = (char *)&box.width - (char *)&box;
+// offsets[3] = (char *)&box.height - (char *)&box;
+// MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_box_type);
+// MPI_Type_commit(&mpi_box_type);
 
 int main(int argc, char *argv[])
 {
@@ -52,27 +66,46 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
     /* find out number of processes */
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    /* create a type for struct box */
-    const int nitems = 4;
-    int blocklengths[4] = {1, 1, 1, 1};
-    MPI_Datatype types[2] = {MPI_INT, MPI_FLOAT, MPI_FLOAT, MPI_FLOAT};
-    MPI_Datatype mpi_box_type;
-    MPI_Aint offsets[4];
-
-    offsets[0] = offsetof(struct box, id);
-    offsets[1] = offsetof(struct box, length);
-    offsets[2] = offsetof(struct box, width);
-    offsets[3] = offsetof(struct box, height);
-
-    MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_box_type);
-    MPI_Type_commit(&mpi_box_type);
+    MPI_Comm_size(MPI_COMM_WORLD, &size); //size = numOfProcesses
 
     n = floorSqrt(size);
-    initFloatsRead(my_rank, n);
 
-    MPI_Type_free(&mpi_box_type);
+    /////////////////////////////////////////////////////////////////////
+    FILE *input_file;
+    struct Box input;
+    struct Box boxesArray[n];
+    int data = 0, i = 0;
+
+    if (my_rank == 0) //master reads the file
+    {
+        printf("reached master1\n");
+        input_file = fopen(FILE_NAME, "r");
+        if (input_file == NULL)
+        {
+            fprintf(stderr, "\nError opening file\n");
+            exit(1);
+        }
+        while (fread(&input, sizeof(struct Box), 1, input_file))
+        {
+            // printf("id = %d length = %f width = %f height = %f \n", input.id, input.length, input.width, input.height);
+            boxesArray[i] = input;
+            i++;
+        }
+        fclose(input_file);
+        printf("reached master2\n");
+    }
+    printf("sanity check\n");
+    // initFloatsRead(my_rank, n);
+
+    if (my_rank == 0)
+    {
+        printf("reached master3\n");
+        for (int i = 0; i < 16; i++)
+            printBox(boxesArray[i]);
+    }
+    /////////////////////////////////////////////////////////////////////
+
+    // MPI_Type_free(&mpi_box_type);
     /* shut down MPI */
     MPI_Finalize();
 
@@ -81,41 +114,25 @@ int main(int argc, char *argv[])
 
 void initFloatsRead(int n, int my_rank /*, TODO*/)
 {
-    struct box boxesArray[n];
-    boxesArray = handleFileRead(n, my_rank);
-    scatterValuesToOtherProcesses(boxesArray, my_rank /*TODO*/);
+    struct Box boxesArray[n];
+    // handleFileRead(&boxesArray, n, my_rank);
+    // scatterValuesToOtherProcesses(boxesArray, my_rank /*TODO*/);
     // handleNewCommunicatorVariables(/*TODO*/);
 }
 
-void scatterValuesToOtherProcesses(struct box boxesArray[], int my_rank)
+void scatterValuesToOtherProcesses(struct Box boxesArray[], int my_rank)
 {
-    /////////////////////////////////////////////////////////////////////////////////////////////
-    const int nitems = 4;
-    int blocklengths[4] = {1, 1, 1, 1};
-    MPI_Datatype types[2] = {MPI_INT, MPI_FLOAT, MPI_FLOAT, MPI_FLOAT};
-    MPI_Datatype mpi_box_type;
-    MPI_Aint offsets[4];
-
-    offsets[0] = offsetof(struct box, id);
-    offsets[1] = offsetof(struct box, length);
-    offsets[2] = offsetof(struct box, width);
-    offsets[3] = offsetof(struct box, height);
-
-    MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_box_type);
-    MPI_Type_commit(&mpi_box_type);
-    //////////////////////////////////////////////////////////////////////////////////////////////////
-
-    struct box input;
-    MPI_Scatter(boxesArray, 1, mpi_box_type, &input, 1, mpi_box_type, MASTER, MPI_COMM_WORLD);
-    // data = data + 1;
-    // data = 5;
-    MPI_Gather(&input, 1, mpi_box_type, boxesArray, 1, mpi_box_type, MASTER, MPI_COMM_WORLD);
+    struct Box input;
+    // MPI_Scatter(boxesArray, 1, mpi_box_type, &input, 1, mpi_box_type, MASTER, MPI_COMM_WORLD);
+    // // data = data + 1;
+    // // data = 5;
+    // MPI_Gather(&input, 1, mpi_box_type, boxesArray, 1, mpi_box_type, MASTER, MPI_COMM_WORLD);
     if (my_rank == 0)
         for (int i = 0; i < 16; i++)
             printBox(boxesArray[i]);
 }
 
-void printBox(struct box givenBox)
+void printBox(struct Box givenBox)
 {
     printf("My ID is %d\n", givenBox.id);
     printf("My length is %d\n", givenBox.length);
@@ -123,31 +140,30 @@ void printBox(struct box givenBox)
     printf("My heigth is %d\n", givenBox.height);
 }
 
-struct box handleFileRead(int n, int my_rank /*TODO*/)
-{
-    FILE *input_file;
-    struct box input;
-    struct box boxesArray[n];
-    int data = 0, i;
+// void handleFileRead(struct Box *boxesArray, int n, int my_rank /*TODO*/)
+// {
+//     FILE *input_file;
+//     struct Box input;
+//     // struct Box boxesArray[n];
+//     int data = 0, i = 0;
 
-    if (my_rank == 0) //master reads the file
-    {
-        input_file = fopen(FILE_NAME, "r");
-        if (input_file == NULL)
-        {
-            fprintf(stderr, "\nError opening file\n");
-            exit(1);
-        }
-        while (fread(&input, sizeof(struct body), 1, input_file))
-        {
-            // printf("id = %d length = %f width = %f height = %f \n", input.id, input.length, input.width, input.height);
-            boxesArray[i] = input;
-            i++;
-        }
-        fclose(input_file);
-    }
-    return boxesArray;
-}
+//     if (my_rank == 0) //master reads the file
+//     {
+//         input_file = fopen(FILE_NAME, "r");
+//         if (input_file == NULL)
+//         {
+//             fprintf(stderr, "\nError opening file\n");
+//             exit(1);
+//         }
+//         while (fread(&input, sizeof(struct Box), 1, input_file))
+//         {
+//             // printf("id = %d length = %f width = %f height = %f \n", input.id, input.length, input.width, input.height);
+//             *(boxesArray[i]) = input;
+//             i++;
+//         }
+//         fclose(input_file);
+//     }
+// }
 
 // void handleNewCommunicatorVariables(/*TODO*/)
 // {
