@@ -13,17 +13,19 @@
 #define MASTER 0
 
 int floorSqrt(int x);
-void oddEvenSort(float *myValue, int n, int pLeftRank, int pRightRank, int location, int direction);
+void oddEvenSortForRows(float *myValue, int n, int pLeftRank, int pRightRank, int location, int direction);
+void oddEvenSortForCols(float *myValue, int n, int pSourceRank, int pTargetRank, int location, int direction, int rank);
 void compare(float *myValue, float *otherValue, int direction);
 void sanityCheck(int numOfProcesses, int n);
 MPI_Comm getNewCommunicator(int n);
 void getCoordinatesFromGivenRank(MPI_Comm newCommunicator, int rank, int *rowIndex, int *colIndex);
 int getRankFromGivenCoordinates(MPI_Comm newCommunicator, int *rowIndex, int *colIndex);
-void getNeighborsRanksFromGivenRank(MPI_Comm newCommunicator, int rank, int *pRightRank, int *pLeftRank);
+void getNeighborsRanksFromGivenRank(MPI_Comm newCommunicator, int rank, int *pRightRank, int *pLeftRank, int direction);
 void shearSort(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, float myStruct[], int n);
 void sortRows(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, float myStruct[], int n);
 void sortRow(MPI_Comm newCommunicator, int rank, float myStruct[], int n, int row, int direction);
-void testPrint(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, float myStruct[], int n);
+void sortCols(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, float myStruct[], int n);
+void sortCol(MPI_Comm newCommunicator, int rank, float myStruct[], int n, int col);
 void swapFloats(float *myValue, float *otherValue);
 
 int main(int argc, char *argv[])
@@ -58,42 +60,29 @@ int main(int argc, char *argv[])
     rank = getRankFromGivenCoordinates(newCommunicator, &rowIndex, &colIndex);
 
     shearSort(newCommunicator, rank, rowIndex, colIndex, myStruct, n);
+//////////////////////////////////////////////////////////////////////////////////////////////
+    float *sub_rand_nums;
+    if (rank == 0)
+        sub_rand_nums = malloc(sizeof(float) * n);
 
-    testPrint(newCommunicator, rank, rowIndex, colIndex, myStruct, n); //DELETE_ME
+    MPI_Gather(&myStruct[0], sizeof(float), MPI_BYTE, sub_rand_nums, sizeof(float), MPI_BYTE, MASTER, newCommunicator);
+    if (rank == 0)
+    {
+        int row, columns;
+        for (row = 0; row < n; row++)
+        {
+            for (columns = 0; columns < n; columns++)
+                printf("%f     ", sub_rand_nums[row * n + columns]);
+            printf("\n");
+        }
+    }
+    if (rank == 0)
+        free(sub_rand_nums);
 
+    // testPrint(newCommunicator, rank, rowIndex, colIndex, myStruct, n); //DELETE_ME
+//////////////////////////////////////////////////////////////////////////////////////////////////
     MPI_Finalize();
     return 0;
-}
-
-void testPrint(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, float myStruct[], int n)
-{
-    int a = 0, b = 1, c = 2, d = 3;
-    int *ap = &a, *bp = &b, *cp = &c, *dp = &d;
-    int firstRank = getRankFromGivenCoordinates(newCommunicator, ap, ap);
-    int secondRank = getRankFromGivenCoordinates(newCommunicator, ap, bp);
-    int thirdRank = getRankFromGivenCoordinates(newCommunicator, ap, cp);
-    int fourthRank = getRankFromGivenCoordinates(newCommunicator, ap, dp);
-    int fifthRank = getRankFromGivenCoordinates(newCommunicator, bp, ap);
-    int sixthRank = getRankFromGivenCoordinates(newCommunicator, bp, bp);
-    int seventhRank = getRankFromGivenCoordinates(newCommunicator, bp, cp);
-    int eigthRank = getRankFromGivenCoordinates(newCommunicator, bp, dp);
-
-    if (rank == firstRank)
-        printf("my rank is %d and I am at the coordinates (0,0), my value is %f\n", rank, myStruct[0]);
-    if (rank == secondRank)
-        printf("my rank is %d and I am at the coordinates (0,1), my value is %f\n", rank, myStruct[0]);
-    if (rank == thirdRank)
-        printf("my rank is %d and I am at the coordinates (0,2), my value is %f\n", rank, myStruct[0]);
-    if (rank == fourthRank)
-        printf("my rank is %d and I am at the coordinates (0,3), my value is %f\n", rank, myStruct[0]);
-    if (rank == fifthRank)
-        printf("my rank is %d and I am at the coordinates (1,0), my value is %f\n", rank, myStruct[0]);
-    if (rank == sixthRank)
-        printf("my rank is %d and I am at the coordinates (1,1), my value is %f\n", rank, myStruct[0]);
-    if (rank == seventhRank)
-        printf("my rank is %d and I am at the coordinates (1,2), my value is %f\n", rank, myStruct[0]);
-    if (rank == eigthRank)
-        printf("my rank is %d and I am at the coordinates (1,3), my value is %f\n", rank, myStruct[0]);
 }
 
 void shearSort(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, float myStruct[], int n)
@@ -110,6 +99,14 @@ void shearSort(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, f
     int sixthRank = getRankFromGivenCoordinates(newCommunicator, bp, bp);
     int seventhRank = getRankFromGivenCoordinates(newCommunicator, bp, cp);
     int eigthRank = getRankFromGivenCoordinates(newCommunicator, bp, dp);
+    int rank_9 = getRankFromGivenCoordinates(newCommunicator, cp, ap);
+    int rank_10 = getRankFromGivenCoordinates(newCommunicator, cp, bp);
+    int rank_11 = getRankFromGivenCoordinates(newCommunicator, cp, cp);
+    int rank_12 = getRankFromGivenCoordinates(newCommunicator, cp, dp);
+    int rank_13 = getRankFromGivenCoordinates(newCommunicator, dp, ap);
+    int rank_14 = getRankFromGivenCoordinates(newCommunicator, dp, bp);
+    int rank_15 = getRankFromGivenCoordinates(newCommunicator, dp, cp);
+    int rank_16 = getRankFromGivenCoordinates(newCommunicator, dp, dp);
     if (rank == firstRank)
         myStruct[0] = 8.0;
     if (rank == secondRank)
@@ -126,11 +123,36 @@ void shearSort(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, f
         myStruct[0] = 3.0;
     if (rank == eigthRank)
         myStruct[0] = 2.0;
+    if (rank == rank_9)
+        myStruct[0] = 8.0;
+    if (rank == rank_10)
+        myStruct[0] = 6.0;
+    if (rank == rank_11)
+        myStruct[0] = 7.0;
+    if (rank == rank_12)
+        myStruct[0] = 10.0;
+    if (rank == rank_13)
+        myStruct[0] = 1.0;
+    if (rank == rank_14)
+        myStruct[0] = 4.0;
+    if (rank == rank_15)
+        myStruct[0] = 3.0;
+    if (rank == rank_16)
+        myStruct[0] = 2.0;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////
     int nothing;
     int arrayOfNothing[16]; // we gather only to synchronize them - we don't need anything else
-    MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
+    // MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
     sortRows(newCommunicator, rank, rowIndex, colIndex, myStruct, n);
+    // MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
+    sortCols(newCommunicator, rank, rowIndex, colIndex, myStruct, n);
+    // MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
+    sortRows(newCommunicator, rank, rowIndex, colIndex, myStruct, n);
+    // MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
+    sortCols(newCommunicator, rank, rowIndex, colIndex, myStruct, n);
+    // MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
+    sortRows(newCommunicator, rank, rowIndex, colIndex, myStruct, n);
+    // MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
 }
 
 void sortRows(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, float myStruct[], int n)
@@ -138,13 +160,13 @@ void sortRows(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, fl
     int nothing, row;
     int arrayOfNothing[16]; // we gather only to synchronize them - we don't need anything else
     int direction;
-    MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
+    // MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
 
     for (row = 0; row < n; row++)
     {
         direction = row % 2 == 0 ? MIN_TO_MAX : MAX_TO_MIN;
         sortRow(newCommunicator, rank, myStruct, n, row, direction);
-        MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
+        // MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
     }
 }
 
@@ -158,14 +180,89 @@ void sortRow(MPI_Comm newCommunicator, int rank, float myStruct[], int n, int ro
         int currentRank = getRankFromGivenCoordinates(newCommunicator, &row, &col); //(0,0)
         if (rank == currentRank)
         {
-            getNeighborsRanksFromGivenRank(newCommunicator, currentRank, &pRightRank, &pLeftRank);
+            getNeighborsRanksFromGivenRank(newCommunicator, currentRank, &pRightRank, &pLeftRank, HORIZONTAL_DIRECTION);
             int location = row * n + col; // converting to the location paramerter that oddEvenSort accept
-            oddEvenSort(&myStruct[0], n, pLeftRank, pRightRank, location, direction);
+            oddEvenSortForRows(&myStruct[0], n, pLeftRank, pRightRank, location, direction);
         }
     }
 }
 
-void oddEvenSort(float *myValue, int n, int pLeftRank, int pRightRank, int location, int direction)
+void sortCols(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, float myStruct[], int n)
+{
+    int nothing, col;
+    int arrayOfNothing[16]; // we gather only to synchronize them - we don't need anything else
+    // MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
+    for (col = 0; col < n; col++)
+    {
+        sortCol(newCommunicator, rank, myStruct, n, col);
+        // MPI_Gather(&nothing, sizeof(int), MPI_BYTE, arrayOfNothing, sizeof(int), MPI_BYTE, MASTER, newCommunicator);
+    }
+}
+void sortCol(MPI_Comm newCommunicator, int rank, float myStruct[], int n, int col)
+{
+    int pSourceRank, pTargetRank;
+    int colArray[n];
+    int row;
+    for (row = 0; row < n; row++)
+    {
+        int currentRank = getRankFromGivenCoordinates(newCommunicator, &row, &col); //(0,0)
+        if (rank == currentRank)
+        {
+
+            getNeighborsRanksFromGivenRank(newCommunicator, currentRank, &pTargetRank, &pSourceRank, VERTICAL_DIRECTION);
+            int location = row * n + col; // converting to the location paramerter that oddEvenSort accept
+            oddEvenSortForCols(&myStruct[0], n, pSourceRank, pTargetRank, location, VERTICAL_DIRECTION, rank);
+        }
+    }
+}
+
+void oddEvenSortForCols(float *myValue, int n, int pSourceRank, int pTargetRank, int location, int direction, int rank)
+{
+    MPI_Status status;
+    float *otherValue = (float *)malloc(sizeof(float));
+    // printf("rank number #%d has source %d and target %d\n", rank, pSourceRank, pTargetRank);
+    int i;
+    for (i = 0; i < n; i++)
+    {
+        if (i % 2 == 0) // An Even Iteration
+        {
+            if ((location < n || (location / n) % 2 == 0) && direction == VERTICAL_DIRECTION) // If the location at an even row
+            {
+
+                // As for right now - the even row on the even iteration sorts and sends back.
+                MPI_Recv(otherValue, 1, MPI_FLOAT, pTargetRank, TAG, MPI_COMM_WORLD, &status);
+                compare(myValue, otherValue, direction);
+                MPI_Send(otherValue, 1, MPI_FLOAT, pTargetRank, TAG, MPI_COMM_WORLD);
+            }
+            else // if the location is odd
+            {
+                MPI_Send(myValue, 1, MPI_FLOAT, pSourceRank, TAG, MPI_COMM_WORLD);
+                MPI_Recv(myValue, 1, MPI_FLOAT, pSourceRank, TAG, MPI_COMM_WORLD, &status);
+            }
+        }
+        else // if odd iteration
+        {
+            if (!(location < n || location >= n * (n - 1))) // edge cases do not participate in odd iterations
+            {
+                if ((location < n || (location / n) % 2 == 0) && direction == VERTICAL_DIRECTION) // If the location at an even row
+                {
+                    MPI_Send(myValue, 1, MPI_FLOAT, pSourceRank, TAG, MPI_COMM_WORLD);
+                    MPI_Recv(myValue, 1, MPI_FLOAT, pSourceRank, TAG, MPI_COMM_WORLD, &status);
+                }
+                else // if location is odd
+                {
+                    // As for right now - the odd location on the odd iteration sorts and sends.
+                    MPI_Recv(otherValue, 1, MPI_FLOAT, pTargetRank, TAG, MPI_COMM_WORLD, &status);
+                    compare(myValue, otherValue, direction);
+                    MPI_Send(otherValue, 1, MPI_FLOAT, pTargetRank, TAG, MPI_COMM_WORLD);
+                }
+            }
+        }
+    }
+    free(otherValue);
+}
+
+void oddEvenSortForRows(float *myValue, int n, int pSourceRank, int pTargetRank, int location, int direction)
 {
 
     MPI_Status status;
@@ -178,14 +275,14 @@ void oddEvenSort(float *myValue, int n, int pLeftRank, int pRightRank, int locat
             if (location % 2 == 0) // If the location is even
             {
                 // As for right now - the even location on the even iteration sorts and sends back.
-                MPI_Recv(otherValue, 1, MPI_FLOAT, pRightRank, TAG, MPI_COMM_WORLD, &status);
+                MPI_Recv(otherValue, 1, MPI_FLOAT, pTargetRank, TAG, MPI_COMM_WORLD, &status);
                 compare(myValue, otherValue, direction);
-                MPI_Send(otherValue, 1, MPI_FLOAT, pRightRank, TAG, MPI_COMM_WORLD);
+                MPI_Send(otherValue, 1, MPI_FLOAT, pTargetRank, TAG, MPI_COMM_WORLD);
             }
             else // if the location is odd
             {
-                MPI_Send(myValue, 1, MPI_FLOAT, pLeftRank, TAG, MPI_COMM_WORLD);
-                MPI_Recv(myValue, 1, MPI_FLOAT, pLeftRank, TAG, MPI_COMM_WORLD, &status);
+                MPI_Send(myValue, 1, MPI_FLOAT, pSourceRank, TAG, MPI_COMM_WORLD);
+                MPI_Recv(myValue, 1, MPI_FLOAT, pSourceRank, TAG, MPI_COMM_WORLD, &status);
             }
         }
         else // if odd iteration
@@ -194,19 +291,20 @@ void oddEvenSort(float *myValue, int n, int pLeftRank, int pRightRank, int locat
             {
                 if (location % 2 == 0) // if location is even
                 {
-                    MPI_Send(myValue, 1, MPI_FLOAT, pLeftRank, TAG, MPI_COMM_WORLD);
-                    MPI_Recv(myValue, 1, MPI_FLOAT, pLeftRank, TAG, MPI_COMM_WORLD, &status);
+                    MPI_Send(myValue, 1, MPI_FLOAT, pSourceRank, TAG, MPI_COMM_WORLD);
+                    MPI_Recv(myValue, 1, MPI_FLOAT, pSourceRank, TAG, MPI_COMM_WORLD, &status);
                 }
                 else // if location is odd
                 {
                     // As for right now - the odd location on the odd iteration sorts and sends.
-                    MPI_Recv(otherValue, 1, MPI_FLOAT, pRightRank, TAG, MPI_COMM_WORLD, &status);
+                    MPI_Recv(otherValue, 1, MPI_FLOAT, pTargetRank, TAG, MPI_COMM_WORLD, &status);
                     compare(myValue, otherValue, direction);
-                    MPI_Send(otherValue, 1, MPI_FLOAT, pRightRank, TAG, MPI_COMM_WORLD);
+                    MPI_Send(otherValue, 1, MPI_FLOAT, pTargetRank, TAG, MPI_COMM_WORLD);
                 }
             }
         }
     }
+    free(otherValue);
 }
 
 void compare(float *myValue, float *otherValue, int direction)
@@ -256,9 +354,9 @@ void sanityCheck(int numOfProcesses, int n)
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
-void getNeighborsRanksFromGivenRank(MPI_Comm newCommunicator, int rank, int *pRightRank, int *pLeftRank)
+void getNeighborsRanksFromGivenRank(MPI_Comm newCommunicator, int rank, int *pRightRank, int *pLeftRank, int direction)
 {
-    MPI_Cart_shift(newCommunicator, HORIZONTAL_DIRECTION, DIRECT_NEIGHBORS, pLeftRank, pRightRank);
+    MPI_Cart_shift(newCommunicator, direction, DIRECT_NEIGHBORS, pLeftRank, pRightRank);
     fflush(stdout);
 }
 
