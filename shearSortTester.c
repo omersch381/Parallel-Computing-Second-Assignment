@@ -36,14 +36,15 @@ void sortUnit(MPI_Comm newCommunicator, int rank, Box *myStruct, int n, int row,
 void sortUnits(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, Box *myStruct, int n, int unit);
 void oddEvenSortGeneral(Box *myStruct, int n, int pSourceRank, int pTargetRank, int location, int direction, int rank, int unit);
 void printBox(Box *givenBox, int rank);
+void readFromFile(int rank, Box boxesArray[]);
 
 int main(int argc, char *argv[])
 {
     int rank, numOfProcesses;
-    MPI_Comm newCommunicator;
     int rowIndex, colIndex;
-
     int n;
+    Box myStruct, boxesArray[numOfProcesses];
+    MPI_Comm newCommunicator;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -53,26 +54,8 @@ int main(int argc, char *argv[])
 
     sanityCheck(numOfProcesses, n);
 
-    FILE *input_file;
-    Box input;
-    Box myStruct;
-    Box boxesArray[numOfProcesses];
-    int data = 0, i;
-    if (rank == 0) //master reads the file
-    {
-        input_file = fopen(FILE_NAME, "r");
-        if (input_file == NULL)
-        {
-            fprintf(stderr, "\nError opening file\n");
-            exit(1);
-        }
-        while (fread(&input, sizeof(Box), 1, input_file))
-        {
-            boxesArray[i] = input;
-            i++;
-        }
-        fclose(input_file);
-    }
+    readFromFile(rank, boxesArray);
+
     MPI_Scatter(boxesArray, sizeof(myStruct), MPI_BYTE, &myStruct, sizeof(myStruct), MPI_BYTE, 0, MPI_COMM_WORLD);
 
     newCommunicator = getNewCommunicator(n);
@@ -89,6 +72,28 @@ int main(int argc, char *argv[])
 
     MPI_Finalize();
     return 0;
+}
+
+void readFromFile(int rank, Box boxesArray[])
+{
+    Box input;
+    int i;
+    FILE *input_file;
+    if (rank == 0) //master reads the file
+    {
+        input_file = fopen(FILE_NAME, "r");
+        if (input_file == NULL)
+        {
+            fprintf(stderr, "\nError opening file\n");
+            exit(1);
+        }
+        while (fread(&input, sizeof(Box), 1, input_file))
+        {
+            boxesArray[i] = input;
+            i++;
+        }
+        fclose(input_file);
+    }
 }
 
 void printBox(Box *givenBox, int rank)
