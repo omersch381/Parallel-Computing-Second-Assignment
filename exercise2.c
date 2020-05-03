@@ -2,14 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#define FILE_NAME "input.dat"
+#define INPUT_FILE_NAME "cuboids.dat"
 #define TAG 0
 #define MIN_TO_MAX 0
 #define MAX_TO_MIN 1
 #define NUM_OF_DIMENSIONS 2
 #define MAX_NUM_OF_DIMENSIONS 2
-#define HORIZONTAL_DIRECTION 1
-#define VERTICAL_DIRECTION 0
 #define DIRECT_NEIGHBORS 1
 #define MASTER 0
 #define ROW 1
@@ -25,7 +23,7 @@ struct
 
 int floorSqrt(int x);
 void compare(Box *myBox, Box *otherBox, int direction);
-void sanityCheck(int numOfProcesses, int n);
+void sanityCheck(int numOfProcesses);
 MPI_Comm getNewCommunicator(int n);
 void getCoordinatesFromGivenRank(MPI_Comm newCommunicator, int rank, int *rowIndex, int *colIndex);
 int getRankFromGivenCoordinates(MPI_Comm newCommunicator, int *rowIndex, int *colIndex);
@@ -35,8 +33,8 @@ void swapBoxes(Box *myBox, Box *otherBox);
 void sortUnit(MPI_Comm newCommunicator, int rank, Box *myStruct, int n, int row, int direction, int unit);
 void sortUnits(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, Box *myStruct, int n, int unit);
 void oddEvenSortGeneral(Box *myStruct, int n, int pSourceRank, int pTargetRank, int location, int direction, int rank, int unit);
-void printBox(Box *givenBox, int rank);
 void readFromFile(int rank, Box boxesArray[]);
+void writeToFile(int rank, Box boxesArray[], int numOfProcesses);
 
 int main(int argc, char *argv[])
 {
@@ -50,13 +48,13 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
 
-    n = floorSqrt(numOfProcesses);
+    sanityCheck(numOfProcesses);
 
-    sanityCheck(numOfProcesses, n);
+    n = floorSqrt(numOfProcesses);
 
     readFromFile(rank, boxesArray);
 
-    MPI_Scatter(boxesArray, sizeof(myStruct), MPI_BYTE, &myStruct, sizeof(myStruct), MPI_BYTE, 0, MPI_COMM_WORLD);
+    MPI_Scatter(boxesArray, sizeof(myStruct), MPI_BYTE, &myStruct, sizeof(myStruct), MPI_BYTE, MASTER, MPI_COMM_WORLD);
 
     newCommunicator = getNewCommunicator(n);
 
@@ -66,12 +64,23 @@ int main(int argc, char *argv[])
 
     shearSort(newCommunicator, rank, rowIndex, colIndex, &myStruct, n);
 
-    MPI_Gather(&myStruct, sizeof(myStruct), MPI_BYTE, boxesArray, sizeof(myStruct), MPI_BYTE, 0, MPI_COMM_WORLD);
+    MPI_Gather(&myStruct, sizeof(myStruct), MPI_BYTE, boxesArray, sizeof(myStruct), MPI_BYTE, MASTER, MPI_COMM_WORLD);
 
-    printBox(&myStruct, rank);
+    writeToFile(rank, boxesArray, numOfProcesses);
 
     MPI_Finalize();
+
     return 0;
+}
+
+void writeToFile(int rank, Box boxesArray[], int numOfProcesses)
+{
+    if (rank == 0)
+    {
+        int i;
+        for (i = 0; i < numOfProcesses; i++)
+            printf("%d\n", boxesArray[i].id); //TODO
+    }
 }
 
 void readFromFile(int rank, Box boxesArray[])
@@ -81,7 +90,7 @@ void readFromFile(int rank, Box boxesArray[])
     FILE *input_file;
     if (rank == 0) //master reads the file
     {
-        input_file = fopen(FILE_NAME, "r");
+        input_file = fopen(INPUT_FILE_NAME, "r");
         if (input_file == NULL)
         {
             fprintf(stderr, "\nError opening file\n");
@@ -94,16 +103,6 @@ void readFromFile(int rank, Box boxesArray[])
         }
         fclose(input_file);
     }
-}
-
-void printBox(Box *givenBox, int rank)
-{
-    printf("\n");
-    // printf("Box : ID is %d", givenBox.id);
-    printf("Box : ID is %d", rank);
-    printf(" length is %d", givenBox->length);
-    printf(" width is %d", givenBox->width);
-    printf(" heigth is %d\n", givenBox->height);
 }
 
 void shearSort(MPI_Comm newCommunicator, int rank, int rowIndex, int colIndex, Box *myStruct, int n)
@@ -241,18 +240,18 @@ int floorSqrt(int x)
     }
     return i - 1;
 }
-void sanityCheck(int numOfProcesses, int n)
+void sanityCheck(int numOfProcesses)
 {
-    if (numOfProcesses != 16)
+    if (numOfProcesses < 4)
     {
-        printf("Please run with 16 processes.\n");
+        printf("Please Run With 4 Or More Processes! Aborting....\n");
         fflush(stdout);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    int isNPowerOfTwo = (n / 2) % 2;
-    if (!isNPowerOfTwo == 0)
+    int areTheNumberOfProcessesPowerOfTwo = ceil(log2(numOfProcesses)) == floor(log2(numOfProcesses));
+    if (!areTheNumberOfProcessesPowerOfTwo) // which means that numOfProcesses is not a power of 2
     {
-        printf("Please run with (n = power of two) processes.\n");
+        printf("Please Run With a Number of Processes That is a Power of 2! Aborting....\n");
         fflush(stdout);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
