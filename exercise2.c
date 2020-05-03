@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 #define INPUT_FILE_NAME "cuboids.dat"
+#define OUTPUT_FILE_NAME "result.dat"
 #define TAG 0
 #define MIN_TO_MAX 0
 #define MAX_TO_MIN 1
@@ -77,9 +78,21 @@ void writeToFile(int rank, Box boxesArray[], int numOfProcesses)
 {
     if (rank == 0)
     {
+        FILE *outfile;
+        int data;
+        // open file for writing
+        outfile = fopen(OUTPUT_FILE_NAME, "w");
+        if (outfile == NULL)
+        {
+            fprintf(stderr, "\nError opend file\n");
+            exit(1);
+        }
         int i;
         for (i = 0; i < numOfProcesses; i++)
-            printf("%d\n", boxesArray[i].id); //TODO
+        {
+            data = boxesArray[i].id;
+            fwrite(&data, sizeof(int), 1, outfile);
+        }
     }
 }
 
